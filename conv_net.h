@@ -25,8 +25,8 @@ private:
     Cube<double> maxpooling_layer(Cube <double> map);
     Cube<double> relu(Cube<double> map);
     Mat<double> softmax(Mat<double> layer);
-    Row <double> flatten(Cube<double> map);
-    void fcLayer(Row<double> flatten);
+    vec flatten(Cube<double> map);
+    void fcLayer(vec flatten);
     Cube<double> ConvLayer(Mat<double> x, Cube<double> kernels);
 
 
@@ -41,8 +41,18 @@ private:
     // initialization of weights
     void init_weights();
 
+    // layer outputs
+    Cube<double> c1;
+    Cube<double> m1;
+    Cube<double> m2;
+    Mat<double> h1;
+    Mat<double> h2;
+    Mat<double> y;
+
     // weights
-    vector<Cube<double>> w1;
+    Cube<double> w1;
+    Mat<double> w2;
+    Mat<double> w3;
 
     // backprop and derivatives
     void backprop();

@@ -1,5 +1,10 @@
 #include "conv_net.h"
 
+/*
+
+INPUT -> CONV -> RELU -> MAXPOOLING -> MAXPOOLING -> FC
+
+*/
 
 ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
 {
@@ -10,7 +15,7 @@ ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
     this->n_output = n_outputs;
     this->kernel_size = kernel_size;
 
-//    this->init_weights();
+    //    this->init_weights();
 }
 
 
@@ -28,9 +33,8 @@ void ConvNet::to2d(Cube<double> &layer)
 Cube<double>ConvNet:: ConvLayer(Mat<double> x, Cube<double> kernels)
 {
     Mat<double> sample;
-    Cube<double> output;
     uint n_samples = static_cast<uint>(x.n_rows - kernels.n_rows) + 1;
-    n_samples = 0;
+    Cube<double> output(n_samples, n_samples, kernels.n_slices);
 
     uint kernel_size = static_cast<uint>(kernels.n_rows);
 
@@ -91,15 +95,15 @@ Cube<double> ConvNet::relu(Cube<double> map)
             if(val < 0)
     {
             val = 0;
-    }});
+}});
 
     return  map;
 }
 
 
-Row<double>ConvNet::flatten(Cube<double> map)
+vec ConvNet::flatten(Cube<double> map)
 {
-    Row<double> x_vector(map.n_cols * map.n_rows*map.n_slices);
+    vec x_vector(map.n_cols * map.n_rows*map.n_slices);
     uint i =0;
     for (uint slice = 0;slice < map.n_slices;slice++)
     {
@@ -116,7 +120,7 @@ Row<double>ConvNet::flatten(Cube<double> map)
     return  x_vector;
 }
 
-void ConvNet:: fcLayer(Row<double> flatten)
+void ConvNet:: fcLayer(vec flatten)
 {
 
 }
@@ -129,6 +133,30 @@ Mat<double>ConvNet:: softmax(Mat<double> layer)
     return  layer / layer.max();
 }
 
+
+void ConvNet::test_layers()
+{
+    try {
+        Cube<double> test  = randu(3, 3, 1);
+        vec vec_test = this->flatten(test);
+    } catch (const std::exception& e) {
+        qDebug() <<e.what();
+        qDebug() <<"Error in flatten";
+    }
+    // test flatten
+
+    try {
+        Mat<double> test = randu(28, 28);
+        Cube<double> test_kernels = randu(5, 5, 6);
+        Cube<double> res = this->ConvLayer(test, test_kernels);
+        qDebug() << res.n_cols << res.n_rows << res.n_slices;
+        qDebug() <<"Should be" << 24 << 24 << 6;
+    } catch (const std::exception& e) {
+        qDebug() <<e.what();
+        qDebug() <<"Error in flatten";
+    }
+
+}
 
 
 
