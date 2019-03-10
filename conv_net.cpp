@@ -21,13 +21,13 @@ ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
 
 void load(std::string path)
 {
-
 }
 
 void ConvNet::to2d(Cube<double> &layer)
 {
     // reshape 1d dataset to 2d
     // 1x784 to 1x28x28
+
 }
 
 Cube<double>ConvNet:: ConvLayer(Mat<double> x, Cube<double> kernels)
@@ -134,28 +134,65 @@ Mat<double>ConvNet:: softmax(Mat<double> layer)
 }
 
 
+Cube<double>ConvNet:: ConvDerivative(Mat<double> x, Cube<double> SigmaPrev)
+{
+    // 28x28 and 24x24xn -> 5x5xn
+    return this->ConvLayer(x, SigmaPrev);
+}
+
+bool ConvNet::DoubleComp(double a, double b) {
+    return fabs(a - b) < std::numeric_limits<double>::epsilon();
+}
+
+void ConvNet::setMax(Mat<double> &map, uint row, uint col, double max_value)
+{
+    for (uint i = row;i < row + 2;i++)
+    {
+        for(uint j = col;j  < col + 2;j++)
+        {
+            if(!this->DoubleComp(map.at(i, j), max_value))
+            {
+                map.at(i, j) = 0;
+            }
+            else{
+                map.at(i, j) = 1;
+            }
+        }
+    }
+}
+
+Cube<double>ConvNet:: MaxPoolingDerivative(Cube<double> PrevLayer)
+{
+    double max;
+    for (uint slice = 0;slice < PrevLayer.n_slices;slice++)
+    {
+        for (uint row = 0;row < PrevLayer.n_rows;row+=2)
+        {
+            for (uint col = 0;col <  PrevLayer.n_cols;col+=2)
+            {
+                max = PrevLayer.slice(slice).submat(row, col, row+1, col+1).max();
+                this->setMax(PrevLayer.slice(slice), row, col, max);
+            }
+        }
+    }
+    return PrevLayer;
+}
+
+
 void ConvNet::test_layers()
 {
+    arma_rng::set_seed_random();
+
+    qDebug() <<"Testing max-pooling derivative";
     try {
-        Cube<double> test  = randu(3, 3, 1);
-        vec vec_test = this->flatten(test);
+        Cube<double> test = randu(8, 8, 1);
+        test.print();
+        Cube<double> detest = this->MaxPoolingDerivative(test);
+
+        detest.print();
     } catch (const std::exception& e) {
         qDebug() <<e.what();
-        qDebug() <<"Error in flatten";
     }
-    // test flatten
-
-    try {
-        Mat<double> test = randu(28, 28);
-        Cube<double> test_kernels = randu(5, 5, 6);
-        Cube<double> res = this->ConvLayer(test, test_kernels);
-        qDebug() << res.n_cols << res.n_rows << res.n_slices;
-        qDebug() <<"Should be" << 24 << 24 << 6;
-    } catch (const std::exception& e) {
-        qDebug() <<e.what();
-        qDebug() <<"Error in flatten";
-    }
-
 }
 
 
