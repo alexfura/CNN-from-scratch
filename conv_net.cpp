@@ -2,7 +2,7 @@
 
 /*
 
-INPUT -> CONV -> RELU -> MAXPOOLING -> MAXPOOLING -> FC
+INPUT -> CONV -> RELU -> MAXPOOLING -> FC
 
 */
 
@@ -10,6 +10,7 @@ ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
 {
     // n_feature - number of features
     // n_output - number of classes
+    // kernel size
 
     this->n_features = n_features;
     this->n_output = n_outputs;
@@ -19,13 +20,25 @@ ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
 }
 
 
-void load(std::string path)
+void ConvNet::load(std::string path)
 {
+    mat raw = Mat<double>();
+    raw.load(path);
+
+    // expects, that y-label is first column
+
+    // slice Raw matrix to inputs and labels
+    // supposed that zero column in raw data is labels
+
+//    this->features = raw.submat(0, 1, raw.n_rows-1, raw.n_cols-1);
+    this->labels = raw.submat(0, 0, raw.n_rows-1, 0);
+
 }
+
 
 void ConvNet::to2d(Cube<double> &layer)
 {
-    // reshape 1d dataset to 2d
+    // reshape 2d dataset to 3d
     // 1x784 to 1x28x28
 
 }
@@ -120,11 +133,46 @@ vec ConvNet::flatten(Cube<double> map)
     return  x_vector;
 }
 
-void ConvNet:: fcLayer(vec flatten)
+void to3d(vec x, uint rows, uint cols, uint slices)
 {
-
+    Cube<double> output;
+    if(rows * cols * slices != x.n_elem)
+    {
+        return;
+    }
+    //
+    for (uint i = 0;i < x.n_elem;i++)
+    {
+        // reshape vec to 3d
+        
+    }
 }
 
+void ConvNet:: fcLayer(vec flatten)
+{
+    this->h1 = flatten * this->w2;
+    // activate
+
+    this->a3 = this->softmax(this->h1);
+
+    this->h2 = this->w3 * this->a3;
+
+    this->a4 = this->softmax(this->h2);
+}
+
+
+void ConvNet:: feedforward(Mat<double> x)
+{
+    this->c1 = this->ConvLayer(x, this->w1);
+
+    this->a2 = this->relu(c1);
+    
+    this->m1 = this->maxpooling_layer(a2);
+    
+    this->f = this->flatten(m1);
+    
+    this->fcLayer(f);
+}
 
 Mat<double>ConvNet:: softmax(Mat<double> layer)
 {
@@ -194,6 +242,8 @@ void ConvNet::test_layers()
         qDebug() <<e.what();
     }
 }
+
+
 
 
 

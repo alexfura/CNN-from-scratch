@@ -4,6 +4,8 @@
 #include <vector>
 #include <armadillo>
 #include <QtDebug>
+#include <cmath>
+#include <limits>
 
 
 using namespace arma;
@@ -43,11 +45,14 @@ private:
 
     // layer outputs
     Cube<double> c1;
+    Cube<double> a1;
     Cube<double> m1;
-    Cube<double> m2;
+    Cube<double> a2;
+    vec f;
     Mat<double> h1;
+    Mat<double> a3;
     Mat<double> h2;
-    Mat<double> y;
+    Mat<double> a4;
 
     // weights
     Cube<double> w1;
@@ -56,7 +61,20 @@ private:
 
     // backprop and derivatives
     void backprop();
-    Cube<double> ConvGrad(Cube<double> l, vector<Cube<double>> prev_gradient);
+    Cube<double> MaxPoolingDerivative(Cube<double> PrevLayer);
+    Cube<double> ConvDerivative(Mat<double> x, Cube<double> SigmaPrev);
+    void setMax(Mat<double> &map, uint row, uint col, double max_value);
+    bool DoubleComp(double a, double b);
+
+    // dataset
+    Cube<double> features;
+    Mat<double> labels;
+
+    // calculus
+    void feedforward(Mat<double>);
+
+
+
 };
 
 #endif // CONV_NET_H
