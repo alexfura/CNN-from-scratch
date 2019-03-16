@@ -18,8 +18,6 @@ public:
     ConvNet(uint n_features, uint n_outputs, uint kernel_size);
     void load(string path);
     void test_layers();
-    void feedforward(Cube<double> features);
-
 
 
 private:
@@ -41,7 +39,7 @@ private:
     void  to2d(Cube<double> &layer);
 
     // initialization of weights
-    void init_weights();
+    void init_weigths();
 
     // layer outputs
     Cube<double> c1;
@@ -70,9 +68,13 @@ private:
     Cube<double> features;
     Mat<double> labels;
 
-    // calculus
+    // need for calculus
     void feedforward(Mat<double>);
-
+    void get_fc_gradients(Mat<double> y, Mat<double> o);
+    void get_conv_gradient(Mat<double> x);
+    Mat<double> softmax_der(Mat<double>);
+    Mat<double> g1, g2, g3;
+    Mat<double> s2, s3, s1;
 
 
 };

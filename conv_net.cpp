@@ -16,7 +16,7 @@ ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
     this->n_output = n_outputs;
     this->kernel_size = kernel_size;
 
-    //    this->init_weights();
+//    this->init_weights();
 }
 
 
@@ -30,9 +30,21 @@ void ConvNet::load(std::string path)
     // slice Raw matrix to inputs and labels
     // supposed that zero column in raw data is labels
 
-//    this->features = raw.submat(0, 1, raw.n_rows-1, raw.n_cols-1);
+    //    this->features = raw.submat(0, 1, raw.n_rows-1, raw.n_cols-1);
     this->labels = raw.submat(0, 0, raw.n_rows-1, 0);
 
+}
+
+
+void ConvNet:: init_weigths()
+{
+    arma_rng::set_seed_random();
+
+    this->w1 = randu(this->kernel_size, this->kernel_size, 10);
+
+    this->w2 = randu(this->kernel_size / 2 * this->kernel_size / 2, 100);
+
+    this->w3 = randu(100, 10);
 }
 
 
@@ -174,10 +186,35 @@ void ConvNet:: feedforward(Mat<double> x)
     this->fcLayer(f);
 }
 
-Mat<double>ConvNet:: softmax(Mat<double> layer)
+Mat<double>ConvNet:: softmax_der(Mat<double> layer)
+{
+    return  this->softmax(layer) % (1 - this->softmax(layer));
+}
+
+
+void ConvNet:: get_fc_gradients(Mat<double> y, Mat<double> o)
+{
+    Mat<double> error = o - y;
+    this->s3 = error % this->softmax_der(this->h2);
+    this->g3 = s3 * this->a3;
+    this->s2 = s3 * this->w3 * this->softmax_der(this->h1);
+    this->g2 = s2 * this->f;
+    this->s1 = s2 * this->w2;
+    // g3 and g3
+}
+
+
+void ConvNet:: get_conv_gradient(Mat<double> x)
+{
+    // sigma = reshaped s1 (1x1440 -> 12x12-10)
+    Cube<double> sigma;
+    Cube<double> m1_der = this->MaxPoolingDerivative(sigma);
+    this->g1 = this->ConvLayer(x, m1_der);
+}
+
+Mat<double> ConvNet:: softmax(Mat<double> layer)
 {
     layer.for_each([](mat::elem_type &val){val = exp(val);});
-
     return  layer / layer.max();
 }
 
