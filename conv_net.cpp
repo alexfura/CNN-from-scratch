@@ -198,6 +198,17 @@ void ConvNet:: feedforward(Mat<double> x)
     this->fcLayer(f);
 }
 
+void ConvNet:: get_conv_gradient(Mat<double> x)
+{
+    // x - feature map
+    Cube<double> sigma = this->to3d(this->f, 12, 12, 10);
+    qDebug() <<sigma.n_rows<<sigma.n_cols<<sigma.n_slices<<"sigma";
+
+    Cube<double> uppool = this->MaxPoolingDerivative(sigma, this->a1);
+    this->g1 = this->ConvLayer(x, uppool);
+}
+
+
 Mat<double>ConvNet:: softmax_der(Mat<double> layer)
 {
     return  this->softmax(layer) % (1 - this->softmax(layer));
@@ -212,19 +223,6 @@ void ConvNet:: get_fc_gradients(Mat<double> y, Mat<double> o)
     this->s2 = s3 * this->w3 % this->softmax_der(this->h1);
     this->g2 = s2.t() * this->f.t();
     this->s1 = s2 * this->w2;
-    // g3 and g3
-}
-
-
-void ConvNet:: get_conv_gradient(Mat<double> x)
-{
-    // sigma = reshaped s1 (1x1440 -> 12x12-10)
-    Cube<double> sigma = this->to3d(this->f, 12, 12, 10);
-    qDebug() <<sigma.n_rows<<sigma.n_cols<<sigma.n_slices<<"sigma";
-
-//    Cube<double> m1_der = this->MaxPoolingDerivative(sigma);
-//    qDebug() <<m1.n_rows<<m1.n_cols<<m1.n_slices<<"M1";
-//    this->g1 = this->ConvLayer(x, m1_der);
 }
 
 Mat<double> ConvNet:: softmax(Mat<double> layer)
@@ -233,6 +231,19 @@ Mat<double> ConvNet:: softmax(Mat<double> layer)
     return  layer / accu(layer);
 }
 
+Cube<double>ConvNet::relu_derivative(Cube<double> x)
+{
+    // c1
+    return  x.for_each([](mat::elem_type& val){
+        if(val < 0)
+        {
+            val = 0;
+        }
+        else if(val > 0){
+            val = 1;
+        }
+    });
+}
 
 Cube<double>ConvNet:: ConvDerivative(Mat<double> x, Cube<double> SigmaPrev)
 {
@@ -299,52 +310,53 @@ void ConvNet::test_layers()
     } catch (const std::exception& e) {
         qDebug() <<e.what();
     }
-//    qDebug() <<"Testing vec to 3d derivative";
-//    // need for backprop
-//    try {
-//        vec test = randu(9);
+    qDebug() <<"Testing vec to 3d derivative";
+    // need for backprop
+    try {
+        vec test = randu(9);
 
-//        test.print(" bla bla");
+        test.print("test vector");
 
-//        Cube<double> test_3d = this->to3d(test, 3, 3, 1);
+        Cube<double> test_3d = this->to3d(test, 3, 3, 1);
 
-//        test_3d.print("3d 5.0");
+        test_3d.print("3d reshaped");
 
-//    } catch (const std::exception& e) {
-//        qDebug() <<e.what();
-//    }
+    } catch (const std::exception& e) {
+        qDebug() <<e.what();
+    }
 
     // feeedforward
-//    try {
-//        vec x = randu(1440);
-//        this->fcLayer(x);
-//        this->a4.print();
-//        qDebug() <<accu(this->a4);
-//    } catch (const std::exception& e) {
-//        qDebug() <<e.what();
-//    }
+    try {
+        vec x = randu(1440);
+        this->fcLayer(x);
+        this->a4.print();
+        qDebug() <<accu(this->a4);
+    } catch (const std::exception& e) {
+        qDebug() <<e.what();
+    }
 
-//    // backward
-//    try {
-//        this->f = randu(1440);
-//        this->fcLayer(this->f);
-//        Mat<double> y = randu(1, 10);
-//        Mat<double> o = randu(1, 10);
+    // backward for fully-connected
+    try {
+        this->f = randu(1440);
+        this->fcLayer(this->f);
+        Mat<double> y = randu(1, 10);
+        Mat<double> o = randu(1, 10);
 
-//        this->get_fc_gradients(y, o);
-//        qDebug() <<this->g2.n_rows <<this->g2.n_cols <<"G2";
-//        qDebug() <<this->g3.n_rows <<this->g3.n_cols <<"G3";
-//    } catch (const std::exception& e) {
-//        qDebug()<<e.what();
-//    }
-    // conv gradient
-//    try {
-//        this->f = randu(1440);
-//        Mat<double> x = randu(28, 28);
-//        this->get_conv_gradient(x);
-//    } catch (const std::exception& e) {
-//        qDebug() <<e.what();
-//    }{}
+        this->get_fc_gradients(y, o);
+        qDebug() <<this->g2.n_rows <<this->g2.n_cols <<"G2";
+        qDebug() <<this->g3.n_rows <<this->g3.n_cols <<"G3";
+    } catch (const std::exception& e) {
+        qDebug()<<e.what();
+    }
+    // backward for convolutional layer
+    try {
+        this->f = randu(1440);
+        Mat<double> x = randu(28, 28);
+        this->c1 = randu(24, 24, 10);
+        this->get_conv_gradient(x);
+    } catch (const std::exception& e) {
+        qDebug() <<e.what();
+    }
 }
 
 

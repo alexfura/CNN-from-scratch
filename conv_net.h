@@ -63,6 +63,8 @@ private:
     Cube<double>MaxPoolingDerivative(Cube<double> pooledlayer, Cube<double> sigma);
     void setMax(Mat<double> &map, uint row, uint col, double max_value, double value);
     bool DoubleComp(double a, double b);
+    Cube<double> relu_derivative(Cube<double> x);
+
 
     // dataset
     Cube<double> features;
