@@ -59,9 +59,9 @@ private:
 
     // backprop and derivatives
     void backprop();
-    Cube<double> MaxPoolingDerivative(Cube<double> PrevLayer);
     Cube<double> ConvDerivative(Mat<double> x, Cube<double> SigmaPrev);
-    void setMax(Mat<double> &map, uint row, uint col, double max_value);
+    Cube<double>MaxPoolingDerivative(Cube<double> pooledlayer, Cube<double> sigma);
+    void setMax(Mat<double> &map, uint row, uint col, double max_value, double value);
     bool DoubleComp(double a, double b);
 
     // dataset

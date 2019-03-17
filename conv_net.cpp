@@ -219,9 +219,12 @@ void ConvNet:: get_fc_gradients(Mat<double> y, Mat<double> o)
 void ConvNet:: get_conv_gradient(Mat<double> x)
 {
     // sigma = reshaped s1 (1x1440 -> 12x12-10)
-    Cube<double> sigma;
-    Cube<double> m1_der = this->MaxPoolingDerivative(sigma);
-    this->g1 = this->ConvLayer(x, m1_der);
+    Cube<double> sigma = this->to3d(this->f, 12, 12, 10);
+    qDebug() <<sigma.n_rows<<sigma.n_cols<<sigma.n_slices<<"sigma";
+
+//    Cube<double> m1_der = this->MaxPoolingDerivative(sigma);
+//    qDebug() <<m1.n_rows<<m1.n_cols<<m1.n_slices<<"M1";
+//    this->g1 = this->ConvLayer(x, m1_der);
 }
 
 Mat<double> ConvNet:: softmax(Mat<double> layer)
@@ -241,38 +244,41 @@ bool ConvNet::DoubleComp(double a, double b) {
     return fabs(a - b) < std::numeric_limits<double>::epsilon();
 }
 
-void ConvNet::setMax(Mat<double> &map, uint row, uint col, double max_value)
+void ConvNet::setMax(Mat<double> &map, uint row, uint col, double max, double value)
 {
     for (uint i = row;i < row + 2;i++)
     {
         for(uint j = col;j  < col + 2;j++)
         {
-            if(!this->DoubleComp(map.at(i, j), max_value))
+            if(!this->DoubleComp(map.at(i, j), max))
             {
                 map.at(i, j) = 0;
             }
             else{
-                map.at(i, j) = 1;
+                map.at(i, j) = value;
             }
         }
     }
 }
 
-Cube<double>ConvNet:: MaxPoolingDerivative(Cube<double> PrevLayer)
+Cube<double>ConvNet::MaxPoolingDerivative(Cube<double> c1, Cube<double> sigma)
 {
+    // upsample matrix by inserting zeroes
     double max;
-    for (uint slice = 0;slice < PrevLayer.n_slices;slice++)
+    double value = 0;
+    for (uint slice = 0;slice < c1.n_slices;slice++)
     {
-        for (uint row = 0;row < PrevLayer.n_rows;row+=2)
+        for (uint row = 0;row < c1.n_rows;row+=2)
         {
-            for (uint col = 0;col <  PrevLayer.n_cols;col+=2)
+            for (uint col = 0;col <  c1.n_cols;col+=2)
             {
-                max = PrevLayer.slice(slice).submat(row, col, row+1, col+1).max();
-                this->setMax(PrevLayer.slice(slice), row, col, max);
+                max = c1.slice(slice).submat(row, col, row+1, col+1).max();
+                value = sigma.at(row/2, col/2, slice);
+                this->setMax(c1.slice(slice), row, col, max, value);
             }
         }
     }
-    return PrevLayer;
+    return c1;
 }
 
 
@@ -280,16 +286,19 @@ void ConvNet::test_layers()
 {
     arma_rng::set_seed_random();
 
-//    qDebug() <<"Testing max-pooling derivative";
-//    try {
-//        Cube<double> test = randu(8, 8, 1);
-//        test.print();
-//        Cube<double> detest = this->MaxPoolingDerivative(test);
+    qDebug() <<"Testing max-pooling derivative";
+    try {
+        Cube<double> sigma = randu(4, 4, 10);
+        // 24x24x10
+        Cube<double> c1 = randu(8, 8, 10);
+        Cube<double> der = this->MaxPoolingDerivative(c1, sigma);
 
-//        detest.print();
-//    } catch (const std::exception& e) {
-//        qDebug() <<e.what();
-//    }
+        c1.slice(0).print(" C1 - SLICE");
+        sigma.slice(0).print(" SIGMA ");
+        der.slice(0).print("UPPOOLED MAP");
+    } catch (const std::exception& e) {
+        qDebug() <<e.what();
+    }
 //    qDebug() <<"Testing vec to 3d derivative";
 //    // need for backprop
 //    try {
@@ -328,6 +337,14 @@ void ConvNet::test_layers()
 //    } catch (const std::exception& e) {
 //        qDebug()<<e.what();
 //    }
+    // conv gradient
+//    try {
+//        this->f = randu(1440);
+//        Mat<double> x = randu(28, 28);
+//        this->get_conv_gradient(x);
+//    } catch (const std::exception& e) {
+//        qDebug() <<e.what();
+//    }{}
 }
 
 
