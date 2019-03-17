@@ -1,4 +1,4 @@
-#include "conv_net.h"
+ #include "conv_net.h"
 
 /*
 
@@ -16,7 +16,7 @@ ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
     this->n_output = n_outputs;
     this->kernel_size = kernel_size;
 
-//    this->init_weights();
+    this->init_weigths();
 }
 
 
@@ -30,11 +30,20 @@ void ConvNet::load(std::string path)
     // slice Raw matrix to inputs and labels
     // supposed that zero column in raw data is labels
 
-    //    this->features = raw.submat(0, 1, raw.n_rows-1, raw.n_cols-1);
+    Mat<double> feature_1d = raw.submat(0, 1, raw.n_rows-1, raw.n_cols-1);
+    Mat<double> buffer;
+    this->features = zeros(28, 28, feature_1d.n_rows);
+    for (uint i = 0;i < feature_1d.n_rows;i++)
+    {
+        buffer = feature_1d.row(i);
+        buffer.reshape(28, 28);
+
+        this->features.slice(i) = buffer.t();
+        buffer.clear();
+    }
+    feature_1d.clear();
     this->labels = raw.submat(0, 0, raw.n_rows-1, 0);
-
 }
-
 
 void ConvNet:: init_weigths()
 {
@@ -42,9 +51,9 @@ void ConvNet:: init_weigths()
 
     this->w1 = randu(this->kernel_size, this->kernel_size, 10);
 
-    this->w2 = randu(this->kernel_size / 2 * this->kernel_size / 2, 100);
+    this->w2 = randu(100, 1440);
 
-    this->w3 = randu(100, 10);
+    this->w3 = randu(10, 100);
 }
 
 
@@ -52,7 +61,26 @@ void ConvNet::to2d(Cube<double> &layer)
 {
     // reshape 2d dataset to 3d
     // 1x784 to 1x28x28
+}
 
+Cube<double>ConvNet:: to3d(vec flatten, uint rows, uint cols, uint slices)
+{
+    if(rows * cols * slices == flatten.n_rows)
+    {
+        qDebug() <<"Ok";
+     }
+    Cube<double> output = zeros(rows, cols, slices);
+    Mat<double> buffer;
+    uint step = rows * cols;
+    for (uint i = 0;i < flatten.n_elem;i+= step)
+    {
+        buffer =  flatten.subvec(i, i + step - 1);
+        buffer.reshape(rows, cols);
+
+        output.slice(i/step) = buffer.t();
+    }
+
+    return output;
 }
 
 Cube<double>ConvNet:: ConvLayer(Mat<double> x, Cube<double> kernels)
@@ -145,29 +173,13 @@ vec ConvNet::flatten(Cube<double> map)
     return  x_vector;
 }
 
-void to3d(vec x, uint rows, uint cols, uint slices)
-{
-    Cube<double> output;
-    if(rows * cols * slices != x.n_elem)
-    {
-        return;
-    }
-    //
-    for (uint i = 0;i < x.n_elem;i++)
-    {
-        // reshape vec to 3d
-        
-    }
-}
-
 void ConvNet:: fcLayer(vec flatten)
 {
-    this->h1 = flatten * this->w2;
-    // activate
+    this->h1 = flatten.t() * this->w2.t();
 
     this->a3 = this->softmax(this->h1);
 
-    this->h2 = this->w3 * this->a3;
+    this->h2 = this->a3 * this->w3.t();
 
     this->a4 = this->softmax(this->h2);
 }
@@ -196,9 +208,9 @@ void ConvNet:: get_fc_gradients(Mat<double> y, Mat<double> o)
 {
     Mat<double> error = o - y;
     this->s3 = error % this->softmax_der(this->h2);
-    this->g3 = s3 * this->a3;
-    this->s2 = s3 * this->w3 * this->softmax_der(this->h1);
-    this->g2 = s2 * this->f;
+    this->g3 = s3.t() * this->a3;
+    this->s2 = s3 * this->w3 % this->softmax_der(this->h1);
+    this->g2 = s2.t() * this->f.t();
     this->s1 = s2 * this->w2;
     // g3 and g3
 }
@@ -215,7 +227,7 @@ void ConvNet:: get_conv_gradient(Mat<double> x)
 Mat<double> ConvNet:: softmax(Mat<double> layer)
 {
     layer.for_each([](mat::elem_type &val){val = exp(val);});
-    return  layer / layer.max();
+    return  layer / accu(layer);
 }
 
 
@@ -268,16 +280,54 @@ void ConvNet::test_layers()
 {
     arma_rng::set_seed_random();
 
-    qDebug() <<"Testing max-pooling derivative";
-    try {
-        Cube<double> test = randu(8, 8, 1);
-        test.print();
-        Cube<double> detest = this->MaxPoolingDerivative(test);
+//    qDebug() <<"Testing max-pooling derivative";
+//    try {
+//        Cube<double> test = randu(8, 8, 1);
+//        test.print();
+//        Cube<double> detest = this->MaxPoolingDerivative(test);
 
-        detest.print();
-    } catch (const std::exception& e) {
-        qDebug() <<e.what();
-    }
+//        detest.print();
+//    } catch (const std::exception& e) {
+//        qDebug() <<e.what();
+//    }
+//    qDebug() <<"Testing vec to 3d derivative";
+//    // need for backprop
+//    try {
+//        vec test = randu(9);
+
+//        test.print(" bla bla");
+
+//        Cube<double> test_3d = this->to3d(test, 3, 3, 1);
+
+//        test_3d.print("3d 5.0");
+
+//    } catch (const std::exception& e) {
+//        qDebug() <<e.what();
+//    }
+
+    // feeedforward
+//    try {
+//        vec x = randu(1440);
+//        this->fcLayer(x);
+//        this->a4.print();
+//        qDebug() <<accu(this->a4);
+//    } catch (const std::exception& e) {
+//        qDebug() <<e.what();
+//    }
+
+//    // backward
+//    try {
+//        this->f = randu(1440);
+//        this->fcLayer(this->f);
+//        Mat<double> y = randu(1, 10);
+//        Mat<double> o = randu(1, 10);
+
+//        this->get_fc_gradients(y, o);
+//        qDebug() <<this->g2.n_rows <<this->g2.n_cols <<"G2";
+//        qDebug() <<this->g3.n_rows <<this->g3.n_cols <<"G3";
+//    } catch (const std::exception& e) {
+//        qDebug()<<e.what();
+//    }
 }
 
 

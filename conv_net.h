@@ -73,6 +73,7 @@ private:
     void get_fc_gradients(Mat<double> y, Mat<double> o);
     void get_conv_gradient(Mat<double> x);
     Mat<double> softmax_der(Mat<double>);
+    Cube<double> to3d(vec flatten, uint rows, uint cols, uint slices);
     Mat<double> g1, g2, g3;
     Mat<double> s2, s3, s1;
 
