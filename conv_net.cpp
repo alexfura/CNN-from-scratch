@@ -43,7 +43,22 @@ void ConvNet::load(std::string path)
     }
     feature_1d.clear();
     this->labels = raw.submat(0, 0, raw.n_rows-1, 0);
+    this->labels = this->encode_labels(this->labels);
 }
+
+Mat<double>ConvNet::encode_labels(Mat<double> labels)
+{
+    // n_rows x 1
+    Mat<double> encoded = zeros(this->labels.n_rows, 10);
+
+    for (uint i = 0;i < labels.n_rows;i++)
+    {
+        encoded.at(i, static_cast<uint>(labels.at(i, 0))) = 1;
+    }
+
+    return encoded;
+}
+
 
 void ConvNet:: init_weigths()
 {
@@ -54,13 +69,6 @@ void ConvNet:: init_weigths()
     this->w2 = randu(100, 1440);
 
     this->w3 = randu(10, 100);
-}
-
-
-void ConvNet::to2d(Cube<double> &layer)
-{
-    // reshape 2d dataset to 3d
-    // 1x784 to 1x28x28
 }
 
 Cube<double>ConvNet:: to3d(vec flatten, uint rows, uint cols, uint slices)
