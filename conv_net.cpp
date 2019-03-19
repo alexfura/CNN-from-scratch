@@ -1,4 +1,4 @@
- #include "conv_net.h"
+#include "conv_net.h"
 
 /*
 
@@ -44,6 +44,9 @@ void ConvNet::load(std::string path)
     feature_1d.clear();
     this->labels = raw.submat(0, 0, raw.n_rows-1, 0);
     this->labels = this->encode_labels(this->labels);
+
+    qDebug() <<this->features.n_cols <<this->features.n_rows <<this->features.n_slices <<" - Features";
+    qDebug() <<this->labels.n_cols <<this->labels.n_rows <<" - Labels";
 }
 
 Mat<double>ConvNet::encode_labels(Mat<double> labels)
@@ -216,7 +219,7 @@ void ConvNet:: get_fc_gradients(Mat<double> y, Mat<double> o)
 {
     Mat<double> error = o - y;
     this->s3 = error % this->softmax_der(this->h2);
-    this->g3 = s3.t() * this->a3;
+    this->g3 = this->a2.t() * this->s3;
     this->s2 = s3 * this->w3 % this->softmax_der(this->h1);
     this->g2 = s2.t() * this->f.t();
     this->s1 = s2 * this->w2;
@@ -293,24 +296,39 @@ Cube<double>ConvNet::MaxPoolingDerivative(Cube<double> c1, Cube<double> sigma)
 }
 
 
-void ConvNet:: MBGD(uint batch_size, double learning_rate)
+void ConvNet:: MBGD(uint epochs ,uint batch_size, double learning_rate)
 {
     // mini-batch gradient descent
-    Cube<double> g1_sum = zeros(this->g1.n_rows, this->g1.n_cols, 1);
-    Mat<double> g2_sum = zeros(this->g2.n_rows, this->g2.n_cols);
-    Mat<double> g3_sum = zeros(this->g3.n_rows, this->g3.n_cols);
+    Cube<double> g1_sum = zeros(this->w1.n_rows, this->w1.n_cols, this->w1.n_slices);
+    Mat<double> g2_sum = zeros(this->w2.n_rows, this->w2.n_cols);
+    Mat<double> g3_sum = zeros(this->w3.n_rows, this->w3.n_cols);
     Cube<double> batch;
-    for (uint i = 0;i < this->features.n_slices;i+= batch_size)
+    for (uint epoch = 0;epoch < epochs;epoch++)
     {
-        batch = this->features.subcube(0, 0, i, this->features.n_rows - 1,
-                                       this->features.n_cols - 1, i+ batch_size - 1);
-
-        for (uint slice = 0;slice < batch.n_slices;slice++)
+        for (uint i = 0;i < 1;i+= batch_size)
         {
-            this->feedforward(batch.slice(slice));
-            this->get_fc_gradients(this->labels.row(i + slice), this->a3);
-//            g1_sum += this->g1;
+            batch = this->features.subcube(0, 0, i, this->features.n_rows - 1,
+                                           this->features.n_cols - 1, i+ batch_size - 1);
 
+            for (uint slice = 0;slice < batch.n_slices;slice++)
+            {
+                this->feedforward(batch.slice(slice));
+                this->get_fc_gradients(this->labels.row(i + slice), this->a3);
+                this->get_conv_gradient(batch.slice(slice));
+                g1_sum += this->g1;
+                g2_sum += this->g2;
+                g3_sum += this->g3;
+//                qDebug() <<this->a3.index_max() <<this->labels.row(i + slice).index_max() <<"Actual and predicted";
+            }
+
+//            // update weigths
+//            this->w1 -= learning_rate * g1_sum;
+//            this->w2 -= learning_rate * g2_sum;
+//            this->w3 -= learning_rate * g3_sum;
+
+//            g1_sum.zeros();
+//            g2_sum.zeros();
+//            g3_sum.zeros();
         }
     }
 }

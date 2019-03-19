@@ -18,6 +18,8 @@ public:
     ConvNet(uint n_features, uint n_outputs, uint kernel_size);
     void load(string path);
     void test_layers();
+    // training
+    void MBGD(uint epochs, uint batch_size, double);
 
 
 private:
@@ -77,12 +79,6 @@ private:
     Cube<double> g1;
     Mat<double> g2, g3;
     Mat<double> s2, s3, s1;
-
-    // training
-    void MBGD(uint batch_size, double);
-
-
-
 };
 
 #endif // CONV_NET_H
