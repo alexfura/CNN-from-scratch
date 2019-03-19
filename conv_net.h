@@ -45,12 +45,11 @@ private:
     Cube<double> c1;
     Cube<double> a1;
     Cube<double> m1;
-    Cube<double> a2;
     vec f;
     Mat<double> h1;
-    Mat<double> a3;
+    Mat<double> a2;
     Mat<double> h2;
-    Mat<double> a4;
+    Mat<double> a3;
 
     // weights
     Cube<double> w1;
@@ -59,7 +58,6 @@ private:
 
     // backprop and derivatives
     void backprop();
-    Cube<double> ConvDerivative(Mat<double> x, Cube<double> SigmaPrev);
     Cube<double>MaxPoolingDerivative(Cube<double> pooledlayer, Cube<double> sigma);
     void setMax(Mat<double> &map, uint row, uint col, double max_value, double value);
     bool DoubleComp(double a, double b);
@@ -76,8 +74,13 @@ private:
     void get_fc_gradients(Mat<double> y, Mat<double> o);
     void get_conv_gradient(Mat<double> x);
     Mat<double> softmax_der(Mat<double>);
-    Mat<double> g1, g2, g3;
+    Cube<double> g1;
+    Mat<double> g2, g3;
     Mat<double> s2, s3, s1;
+
+    // training
+    void MBGD(uint batch_size, double);
+
 
 
 };

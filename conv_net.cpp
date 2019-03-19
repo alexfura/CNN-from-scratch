@@ -75,8 +75,8 @@ Cube<double>ConvNet:: to3d(vec flatten, uint rows, uint cols, uint slices)
 {
     if(rows * cols * slices == flatten.n_rows)
     {
-        qDebug() <<"Ok";
-     }
+        throw std::logic_error("Conversion error!");
+    }
     Cube<double> output = zeros(rows, cols, slices);
     Mat<double> buffer;
     uint step = rows * cols;
@@ -185,11 +185,11 @@ void ConvNet:: fcLayer(vec flatten)
 {
     this->h1 = flatten.t() * this->w2.t();
 
-    this->a3 = this->softmax(this->h1);
+    this->a2 = this->softmax(this->h1);
 
-    this->h2 = this->a3 * this->w3.t();
+    this->h2 = this->a2 * this->w3.t();
 
-    this->a4 = this->softmax(this->h2);
+    this->a3 = this->softmax(this->h2);
 }
 
 
@@ -197,25 +197,14 @@ void ConvNet:: feedforward(Mat<double> x)
 {
     this->c1 = this->ConvLayer(x, this->w1);
 
-    this->a2 = this->relu(c1);
+    this->a1 = this->relu(c1);
     
-    this->m1 = this->maxpooling_layer(a2);
+    this->m1 = this->maxpooling_layer(a1);
     
     this->f = this->flatten(m1);
     
     this->fcLayer(f);
 }
-
-void ConvNet:: get_conv_gradient(Mat<double> x)
-{
-    // x - feature map
-    Cube<double> sigma = this->to3d(this->f, 12, 12, 10);
-    qDebug() <<sigma.n_rows<<sigma.n_cols<<sigma.n_slices<<"sigma";
-
-    Cube<double> uppool = this->MaxPoolingDerivative(sigma, this->a1);
-    this->g1 = this->ConvLayer(x, uppool);
-}
-
 
 Mat<double>ConvNet:: softmax_der(Mat<double> layer)
 {
@@ -253,10 +242,13 @@ Cube<double>ConvNet::relu_derivative(Cube<double> x)
     });
 }
 
-Cube<double>ConvNet:: ConvDerivative(Mat<double> x, Cube<double> SigmaPrev)
+void ConvNet:: get_conv_gradient(Mat<double> x)
 {
-    // 28x28 and 24x24xn -> 5x5xn
-    return this->ConvLayer(x, SigmaPrev);
+    // x - feature map
+    vec s1_vec = vectorise(s1);
+    Cube<double> sigma = this->to3d(s1_vec, 12, 12, 10);
+    Cube<double> uppool = this->MaxPoolingDerivative(this->a1, sigma);
+    this->g1 = this->ConvLayer(x, uppool);
 }
 
 bool ConvNet::DoubleComp(double a, double b) {
@@ -301,67 +293,38 @@ Cube<double>ConvNet::MaxPoolingDerivative(Cube<double> c1, Cube<double> sigma)
 }
 
 
+void ConvNet:: MBGD(uint batch_size, double learning_rate)
+{
+    // mini-batch gradient descent
+    Cube<double> g1_sum = zeros(this->g1.n_rows, this->g1.n_cols, 1);
+    Mat<double> g2_sum = zeros(this->g2.n_rows, this->g2.n_cols);
+    Mat<double> g3_sum = zeros(this->g3.n_rows, this->g3.n_cols);
+    Cube<double> batch;
+    for (uint i = 0;i < this->features.n_slices;i+= batch_size)
+    {
+        batch = this->features.subcube(0, 0, i, this->features.n_rows - 1,
+                                       this->features.n_cols - 1, i+ batch_size - 1);
+
+        for (uint slice = 0;slice < batch.n_slices;slice++)
+        {
+            this->feedforward(batch.slice(slice));
+            this->get_fc_gradients(this->labels.row(i + slice), this->a3);
+//            g1_sum += this->g1;
+
+        }
+    }
+}
+
+
 void ConvNet::test_layers()
 {
     arma_rng::set_seed_random();
-
-    qDebug() <<"Testing max-pooling derivative";
     try {
-        Cube<double> sigma = randu(4, 4, 10);
-        // 24x24x10
-        Cube<double> c1 = randu(8, 8, 10);
-        Cube<double> der = this->MaxPoolingDerivative(c1, sigma);
-
-        c1.slice(0).print(" C1 - SLICE");
-        sigma.slice(0).print(" SIGMA ");
-        der.slice(0).print("UPPOOLED MAP");
-    } catch (const std::exception& e) {
-        qDebug() <<e.what();
-    }
-    qDebug() <<"Testing vec to 3d derivative";
-    // need for backprop
-    try {
-        vec test = randu(9);
-
-        test.print("test vector");
-
-        Cube<double> test_3d = this->to3d(test, 3, 3, 1);
-
-        test_3d.print("3d reshaped");
-
-    } catch (const std::exception& e) {
-        qDebug() <<e.what();
-    }
-
-    // feeedforward
-    try {
-        vec x = randu(1440);
-        this->fcLayer(x);
-        this->a4.print();
-        qDebug() <<accu(this->a4);
-    } catch (const std::exception& e) {
-        qDebug() <<e.what();
-    }
-
-    // backward for fully-connected
-    try {
-        this->f = randu(1440);
-        this->fcLayer(this->f);
-        Mat<double> y = randu(1, 10);
-        Mat<double> o = randu(1, 10);
-
-        this->get_fc_gradients(y, o);
-        qDebug() <<this->g2.n_rows <<this->g2.n_cols <<"G2";
-        qDebug() <<this->g3.n_rows <<this->g3.n_cols <<"G3";
-    } catch (const std::exception& e) {
-        qDebug()<<e.what();
-    }
-    // backward for convolutional layer
-    try {
-        this->f = randu(1440);
-        Mat<double> x = randu(28, 28);
-        this->c1 = randu(24, 24, 10);
-        this->get_conv_gradient(x);
+        this->features = randu(28, 28, 1);
+        this->labels = randu(1, 10);
+        this->feedforward(this->features.slice(0));
+        this->get_fc_gradients(this->labels, this->a3);
+        this->get_conv_gradient(this->features.slice(0));
     } catch (const std::exception& e) {
         qDebug() <<e.what();
     }
