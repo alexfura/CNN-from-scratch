@@ -73,7 +73,7 @@ void ConvNet:: init_weigths()
 
 Cube<double>ConvNet:: to3d(vec flatten, uint rows, uint cols, uint slices)
 {
-    if(rows * cols * slices == flatten.n_rows)
+    if(rows * cols * slices != flatten.n_rows)
     {
         throw std::logic_error("Conversion error!");
     }
@@ -325,6 +325,11 @@ void ConvNet::test_layers()
         this->feedforward(this->features.slice(0));
         this->get_fc_gradients(this->labels, this->a3);
         this->get_conv_gradient(this->features.slice(0));
+
+        qDebug() <<this->g1.n_cols<<this->g1.n_rows <<this->g1.n_slices <<"G1";
+        qDebug() <<this->g2.n_cols<<this->g2.n_rows <<"G2";
+        qDebug() <<this->g3.n_cols<<this->g3.n_rows <<"G3";
+
     } catch (const std::exception& e) {
         qDebug() <<e.what();
     }
