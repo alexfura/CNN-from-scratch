@@ -18,9 +18,16 @@ public:
     ConvNet(uint n_features, uint n_outputs, uint kernel_size);
     void load(string path);
     void test_layers();
+    void restore();
     // training
     void MBGD(uint epochs, uint batch_size, double);
 
+    // testing
+    uint predict(Mat<double>);
+    void count_score();
+
+    // saving model
+    void save_model();
 
 private:
     // layers
@@ -79,6 +86,10 @@ private:
     Cube<double> g1;
     Mat<double> g2, g3;
     Mat<double> s2, s3, s1;
+
+    //destructor
+    ~ConvNet();
+
 };
 
 #endif // CONV_NET_H

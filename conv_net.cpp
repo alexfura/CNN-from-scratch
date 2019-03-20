@@ -19,6 +19,10 @@ ConvNet::ConvNet(uint n_features, uint n_outputs, uint kernel_size)
     this->init_weigths();
 }
 
+ConvNet::~ConvNet()
+{
+}
+
 
 void ConvNet::load(std::string path)
 {
@@ -297,13 +301,18 @@ Cube<double>ConvNet::MaxPoolingDerivative(Cube<double> c1, Cube<double> sigma)
 }
 
 
-void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate)
+void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate, double momentum)
 {
     // mini-batch gradient descent
     Cube<double> g1_sum = zeros(this->w1.n_rows, this->w1.n_cols, this->w1.n_slices);
     Mat<double> g2_sum = zeros(this->w2.n_rows, this->w2.n_cols);
     Mat<double> g3_sum = zeros(this->w3.n_rows, this->w3.n_cols);
+
+    Cube<double> v1;
+    Cube<double> v2;
+    Cube<double> v3;
     Cube<double> batch;
+    double score = 0;
     for (uint epoch = 0;epoch < epochs;epoch++)
     {
         qDebug() <<"Epoch: "<<epoch;
@@ -312,17 +321,20 @@ void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate)
             batch = this->features.subcube(0, 0, i, this->features.n_rows - 1,
                                            this->features.n_cols - 1, i+ batch_size - 1);
 
-            for (uint slice = 0;slice < batch.n_slices;slice++)
+            for (uint slice = 0;slice < batch.n_slices - 1;slice++)
             {
                 this->feedforward(batch.slice(slice));
+                if(this->labels.row(i+slice).index_max() == this->a3.index_max())
+                {
+                    score++;
+                }
                 this->get_fc_gradients(this->labels.row(i + slice), this->a3);
                 this->get_conv_gradient(batch.slice(slice));
                 g1_sum += this->g1;
                 g2_sum += this->g2;
                 g3_sum += this->g3;
             }
-
-//            // update weigths
+            // update weigths
             this->w1 -= learning_rate * g1_sum;
             this->w2 -= learning_rate * g2_sum;
             this->w3 -= learning_rate * g3_sum;
@@ -331,7 +343,47 @@ void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate)
             g2_sum.zeros();
             g3_sum.zeros();
         }
+        qDebug() << score / this->features.n_slices <<" % Total";
+        score = 0;
     }
+}
+
+uint ConvNet::predict(Mat<double> input)
+{
+    this->feedforward(input);
+
+    return this->a3.index_max();
+}
+
+
+void ConvNet:: count_score()
+{
+    double score = 0;
+    for (uint i = 0;i < this->features.n_slices;i++)
+    {
+        if(predict(this->features.slice(i)) == this->labels.row(i).index_max())
+        {
+            score++;
+        }
+    }
+
+    qDebug() <<score / this->features.n_slices <<" - % Total score";
+}
+
+
+void ConvNet::save_model()
+{
+    this->w1.save(hdf5_name("w1.h5"));
+    this->w2.save(hdf5_name("w2.h5"));
+    this->w3.save(hdf5_name("w3.h5"));
+}
+
+
+void ConvNet::restore()
+{
+    this->w1.load(hdf5_name("w1.h5"));
+    this->w2.load(hdf5_name("w2.h5"));
+    this->w3.load(hdf5_name("w3.h5"));
 }
 
 
@@ -349,8 +401,6 @@ void ConvNet::test_layers()
         qDebug() <<e.what();
     }
 }
-
-
 
 
 
