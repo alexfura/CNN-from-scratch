@@ -308,9 +308,9 @@ void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate, double m
     Mat<double> g2_sum = zeros(this->w2.n_rows, this->w2.n_cols);
     Mat<double> g3_sum = zeros(this->w3.n_rows, this->w3.n_cols);
 
-    Cube<double> v1;
-    Cube<double> v2;
-    Cube<double> v3;
+//    Cube<double> v1 = zeros(this->w1.n_rows, this->w1.n_cols, this->w1.n_slices);
+//    Mat<double> v2 = zeros(this->w2.n_rows, this->w2.n_cols);
+//    Mat<double> v3 = zeros(this->w3.n_rows, this->w3.n_cols);
     Cube<double> batch;
     double score = 0;
     for (uint epoch = 0;epoch < epochs;epoch++)
@@ -324,6 +324,7 @@ void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate, double m
             for (uint slice = 0;slice < batch.n_slices - 1;slice++)
             {
                 this->feedforward(batch.slice(slice));
+//                qDebug() <<this->a3.index_max() <<" - Predicted" <<this->labels.row(i + slice).index_max() <<" - Actual";
                 if(this->labels.row(i+slice).index_max() == this->a3.index_max())
                 {
                     score++;
@@ -335,7 +336,11 @@ void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate, double m
                 g3_sum += this->g3;
             }
             // update weigths
-            this->w1 -= learning_rate * g1_sum;
+//            v1 = momentum * v1 - learning_rate * g1_sum;
+//            v2 = momentum * v2 - learning_rate * g2_sum;
+//            v3 = momentum * v3 - learning_rate * g3_sum;
+
+            this->w1 -= learning_rate *g1_sum;
             this->w2 -= learning_rate * g2_sum;
             this->w3 -= learning_rate * g3_sum;
 
@@ -351,6 +356,7 @@ void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate, double m
 uint ConvNet::predict(Mat<double> input)
 {
     this->feedforward(input);
+    this->a3.print();
 
     return this->a3.index_max();
 }

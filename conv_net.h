@@ -20,7 +20,7 @@ public:
     void test_layers();
     void restore();
     // training
-    void MBGD(uint epochs, uint batch_size, double);
+    void MBGD(uint epochs, uint batch_size, double learning_rate, double momentum);
 
     // testing
     uint predict(Mat<double>);
