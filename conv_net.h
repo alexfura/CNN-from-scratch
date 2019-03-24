@@ -34,7 +34,6 @@ private:
     Cube<double> maxpooling_layer(Cube <double> map);
     Cube<double> relu(Cube<double> map);
     Mat<double> softmax(Mat<double> layer);
-    vec flatten(Cube<double> map);
     void fcLayer(vec flatten);
     Cube<double> ConvLayer(Mat<double> x, Cube<double> kernels);
 
@@ -66,7 +65,9 @@ private:
     Mat<double> w3;
 
     // backprop and derivatives
-    void backprop();
+    void backprop_fc(Mat<double> y, Mat<double> output, Mat<double> &g3, Mat<double> &g2,
+                     vec h1, Mat<double> h2, Mat<double> a2, Mat<double> &s1);
+    void backprop_c(Mat<double> x);
     Cube<double>MaxPoolingDerivative(Cube<double> pooledlayer, Cube<double> sigma);
     void setMax(Mat<double> &map, uint row, uint col, double max_value, double value);
     bool DoubleComp(double a, double b);

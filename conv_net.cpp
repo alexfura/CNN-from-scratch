@@ -1,4 +1,5 @@
 #include "conv_net.h"
+#include <QTime>
 
 /*
 
@@ -50,7 +51,6 @@ void ConvNet::load(std::string path)
     this->labels = this->encode_labels(this->labels);
 
     this->features /= 255;
-//    this->features.for_each([](mat::elem_type& val){if(val > 0){val = 1;}});
 }
 
 Mat<double>ConvNet::encode_labels(Mat<double> labels)
@@ -71,9 +71,9 @@ void ConvNet:: init_weigths()
 {
     arma_rng::set_seed_random();
 
-    this->w1 = randu(this->kernel_size, this->kernel_size, 10);
+    this->w1 = randu(this->kernel_size, this->kernel_size, 3);
 
-    this->w2 = randu(100, 1440);
+    this->w2 = randu(100, 432);
 
     this->w3 = randu(10, 100);
 }
@@ -115,7 +115,7 @@ Cube<double>ConvNet:: ConvLayer(Mat<double> x, Cube<double> kernels)
                 sample = x.submat(row, col, row + kernel_size- 1,
                                   col + kernel_size - 1);
 
-                output.at(row, col, kernel) = accu(sample);
+                output.at(row, col, kernel) = accu(sample % kernels.slice(kernel));
             }
         }
     }
@@ -158,35 +158,10 @@ Cube<double> ConvNet::maxpooling_layer(Cube <double> map)
 
 Cube<double> ConvNet::relu(Cube<double> map)
 {
-    map =  map.for_each([](mat::elem_type &val)
-    {
-            if(val < 0)
-    {
-            val = 0;
-}});
-
+    map =  map.for_each([](mat::elem_type &val){if(val < 0){ val = 0;}});
     return  map;
 }
 
-
-vec ConvNet::flatten(Cube<double> map)
-{
-    vec x_vector(map.n_cols * map.n_rows*map.n_slices);
-    uint i =0;
-    for (uint slice = 0;slice < map.n_slices;slice++)
-    {
-        for (uint row = 0;row < map.n_rows;row++)
-        {
-            for (uint col = 0;col < map.n_cols;col++)
-            {
-                x_vector.at(i) = map.at(row, col, slice);
-                i++;
-            }
-        }
-    }
-
-    return  x_vector;
-}
 
 void ConvNet:: fcLayer(vec flatten)
 {
@@ -208,7 +183,7 @@ void ConvNet:: feedforward(Mat<double> x)
     
     this->m1 = this->maxpooling_layer(a1);
     
-    this->f = this->flatten(m1);
+    this->f = vectorise(this->m1);
     
     this->fcLayer(f);
 }
@@ -216,17 +191,6 @@ void ConvNet:: feedforward(Mat<double> x)
 Mat<double>ConvNet:: softmax_der(Mat<double> layer)
 {
     return  this->softmax(layer) % (1 - this->softmax(layer));
-}
-
-
-void ConvNet:: get_fc_gradients(Mat<double> y, Mat<double> o)
-{
-    Mat<double> error = o - y;
-    this->s3 = error % this->softmax_der(this->h2);
-    this->g3 = this->s3.t() * this->a2;
-    this->s2 = s3 * this->w3 % this->softmax_der(this->h1);
-    this->g2 = s2.t() * this->f.t();
-    this->s1 = s2 * this->w2;
 }
 
 Mat<double> ConvNet:: softmax(Mat<double> layer)
@@ -250,13 +214,24 @@ Cube<double>ConvNet::relu_derivative(Cube<double> x)
     });
 }
 
+void ConvNet:: get_fc_gradients(Mat<double> y, Mat<double> o)
+{
+    Mat<double> error = o - y;
+    this->s3 = error % this->softmax_der(this->h2);
+    this->g3 = this->s3.t() * this->a2;
+    this->s2 = s3 * this->w3 % this->softmax_der(this->h1);
+    this->g2 = s2.t() * this->f.t();
+    this->s1 = s2 * this->w2;
+}
+
 void ConvNet:: get_conv_gradient(Mat<double> x)
 {
     // x - feature map
     vec s1_vec = vectorise(s1);
-    Cube<double> sigma = this->to3d(s1_vec, 12, 12, 10);
-    Cube<double> uppool = this->MaxPoolingDerivative(this->a1, sigma);
-    this->g1 = this->ConvLayer(x, uppool);
+    Cube<double> sigma = this->to3d(s1_vec, this->m1.n_rows, this->m1.n_cols, 3);
+    Cube<double> uppool = this->MaxPoolingDerivative(this->c1, sigma);
+    Cube<double> relu_der = this->relu_derivative(this->c1);
+    this->g1 = this->ConvLayer(x, uppool % relu_der);
 }
 
 bool ConvNet::DoubleComp(double a, double b) {
@@ -301,62 +276,52 @@ Cube<double>ConvNet::MaxPoolingDerivative(Cube<double> c1, Cube<double> sigma)
 }
 
 
+double cross_entropy(Mat<double> y, Mat<double> output)
+{
+    return -1 * accu(y % output.for_each([](mat::elem_type &val){val = log(val);}));
+}
+
+
 void ConvNet:: MBGD(uint epochs, uint batch_size, double learning_rate, double momentum)
 {
-    // mini-batch gradient descent
     Cube<double> g1_sum = zeros(this->w1.n_rows, this->w1.n_cols, this->w1.n_slices);
     Mat<double> g2_sum = zeros(this->w2.n_rows, this->w2.n_cols);
     Mat<double> g3_sum = zeros(this->w3.n_rows, this->w3.n_cols);
 
-//    Cube<double> v1 = zeros(this->w1.n_rows, this->w1.n_cols, this->w1.n_slices);
-//    Mat<double> v2 = zeros(this->w2.n_rows, this->w2.n_cols);
-//    Mat<double> v3 = zeros(this->w3.n_rows, this->w3.n_cols);
-    Cube<double> batch;
-    double score = 0;
-    for (uint epoch = 0;epoch < epochs;epoch++)
-    {
-        qDebug() <<"Epoch: "<<epoch;
-        for (uint i = 0;i < this->features.n_slices;i+= batch_size)
+    for (uint epoch = 0;epoch < epochs;epoch++) {
+        for (uint slice = 0;slice < this->features.n_slices;slice++)
         {
-            batch = this->features.subcube(0, 0, i, this->features.n_rows - 1,
-                                           this->features.n_cols - 1, i+ batch_size - 1);
+            this->feedforward(this->features.slice(slice));
+            this->get_fc_gradients(this->labels.row(slice), this->a3);
+            this->get_conv_gradient(this->features.slice(slice));
 
-            for (uint slice = 0;slice < batch.n_slices - 1;slice++)
+            qDebug() <<"Predicted: "<< this->a3.index_max() <<" Actual value"<<this->labels.row(slice).index_max();
+            qDebug() <<"Error" <<cross_entropy(this->labels.row(slice), this->a3);
+            g1_sum += this->g1;
+            g2_sum += this->g2;
+            g3_sum += this->g3;
+
+            if(slice % (batch_size - 1) == 0 && slice)
             {
-                this->feedforward(batch.slice(slice));
-//                qDebug() <<this->a3.index_max() <<" - Predicted" <<this->labels.row(i + slice).index_max() <<" - Actual";
-                if(this->labels.row(i+slice).index_max() == this->a3.index_max())
-                {
-                    score++;
-                }
-                this->get_fc_gradients(this->labels.row(i + slice), this->a3);
-                this->get_conv_gradient(batch.slice(slice));
-                g1_sum += this->g1;
-                g2_sum += this->g2;
-                g3_sum += this->g3;
+                // update weigths
+                this->w1 -= learning_rate * g1_sum;
+                this->w2 -= learning_rate * g2_sum;
+                this->w3 -= learning_rate * g3_sum;
+
+                g1_sum.zeros();
+                g2_sum.zeros();
+                g3_sum.zeros();
             }
-            // update weigths
-//            v1 = momentum * v1 - learning_rate * g1_sum;
-//            v2 = momentum * v2 - learning_rate * g2_sum;
-//            v3 = momentum * v3 - learning_rate * g3_sum;
-
-            this->w1 -= learning_rate *g1_sum;
-            this->w2 -= learning_rate * g2_sum;
-            this->w3 -= learning_rate * g3_sum;
-
-            g1_sum.zeros();
-            g2_sum.zeros();
-            g3_sum.zeros();
         }
-        qDebug() << score / this->features.n_slices <<" % Total";
-        score = 0;
     }
 }
+
+
+
 
 uint ConvNet::predict(Mat<double> input)
 {
     this->feedforward(input);
-    this->a3.print();
 
     return this->a3.index_max();
 }
@@ -395,17 +360,6 @@ void ConvNet::restore()
 
 void ConvNet::test_layers()
 {
-    arma_rng::set_seed_random();
-    try {
-        this->feedforward(this->features.slice(0));
-        this->get_fc_gradients(this->labels.row(0), this->a3);
-        this->get_conv_gradient(this->features.slice(0));
-        this->g1.print();
-        this->g2.print();
-        this->g3.print();
-    } catch (const std::exception& e) {
-        qDebug() <<e.what();
-    }
 }
 
 
